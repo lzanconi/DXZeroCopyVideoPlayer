@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <chrono>
+#include "DXShader.h"
 
 // FFmpeg headers (Must be extern "C")
 extern "C" {
@@ -85,6 +86,7 @@ ID3D11SamplerState* g_Sampler = nullptr;
 ID3D11InputLayout* g_Layout = nullptr;
 ID3D11Buffer* g_VBuffer = nullptr;
 
+DXShader dxShader;
 struct Vertex { float x, y, z; float u, v; };
 
 static enum AVPixelFormat get_hw_format(AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts) {
@@ -121,12 +123,37 @@ void InitD3D(HWND hwnd) {
     pBackBuffer->Release();
 
     // Compile Shaders from string
-    ID3DBlob* vsBlob, * psBlob, * errBlob;
-    D3DCompile(shaderSource, strlen(shaderSource), nullptr, nullptr, nullptr, "VS", "vs_5_0", 0, 0, &vsBlob, &errBlob);
-    D3DCompile(shaderSource, strlen(shaderSource), nullptr, nullptr, nullptr, "PS", "ps_5_0", 0, 0, &psBlob, &errBlob);
+    //ID3DBlob* vsBlob, * psBlob, * errBlob;
+    //HRESULT hr;
+    //// Compile Vertex Shader
+    //hr = D3DCompile(shaderSource, strlen(shaderSource), nullptr, nullptr, nullptr, "VS", "vs_5_0", 0, 0, &vsBlob, &errBlob);
+    //if (FAILED(hr)) {
+    //    if (errBlob) {
+    //        fprintf(stderr, "Vertex Shader Error: %s\n", (char*)errBlob->GetBufferPointer());
+    //        errBlob->Release();
+    //    }
+    //    return; // Or handle error appropriately
+    //}
+    //
+    //
+    //// Compile Pixel Shader
+    //hr = D3DCompile(shaderSource, strlen(shaderSource), nullptr, nullptr, nullptr, "PS", "ps_5_0", 0, 0, &psBlob, &errBlob);
+    //if (FAILED(hr)) {
+    //    if (errBlob) {
+    //        fprintf(stderr, "Pixel Shader Error: %s\n", (char*)errBlob->GetBufferPointer());
+    //        errBlob->Release();
+    //    }
+    //    if (vsBlob) vsBlob->Release();
+    //    return;
+    //}
 
-    g_Device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &g_VS);
-    g_Device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &g_PS);
+    //g_Device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &g_VS);
+    //g_Device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &g_PS);
+
+    if (!dxShader.Load(g_Device, L"shaders.hlsl")) {
+        fprintf(stderr, "ERROR: Failed to load shaders.\n");
+        return;
+    }
 
     Vertex vertices[] = {
         { -1,  1, 0, 0, 0 }, {  1,  1, 0, 1, 0 }, { -1, -1, 0, 0, 1 },
@@ -140,7 +167,8 @@ void InitD3D(HWND hwnd) {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
     };
-    g_Device->CreateInputLayout(ied, 2, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), &g_Layout);
+    g_Device->CreateInputLayout(ied, 2, dxShader.VSBytecode->GetBufferPointer(), 
+        dxShader.VSBytecode->GetBufferSize(), &g_Layout);
 
     D3D11_SAMPLER_DESC sampDesc = {};
     sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -353,8 +381,13 @@ int main() {
                 g_Context->IASetVertexBuffers(0, 1, &g_VBuffer, &stride, &offset);
                 g_Context->IASetInputLayout(g_Layout);
                 g_Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-                g_Context->VSSetShader(g_VS, nullptr, 0);
-                g_Context->PSSetShader(g_PS, nullptr, 0);
+                
+                /*g_Context->VSSetShader(g_VS, nullptr, 0);
+                g_Context->PSSetShader(g_PS, nullptr, 0);*/
+
+                g_Context->VSSetShader(dxShader.VertexShader.Get(), nullptr, 0);
+                g_Context->PSSetShader(dxShader.PixelShader.Get(), nullptr, 0);
+
                 g_Context->PSSetShaderResources(0, 1, &g_SrvY);
                 g_Context->PSSetShaderResources(1, 1, &g_SrvUV);
                 g_Context->PSSetSamplers(0, 1, &g_Sampler);
