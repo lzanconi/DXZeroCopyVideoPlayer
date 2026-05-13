@@ -14,6 +14,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_d3d11va.h>
+#include "DXRenderer.h"
 }
 
 // MANUALLY DEFINE THE INTERFACE IF HEADERS FAIL
@@ -39,41 +40,6 @@ public:
 #pragma comment(lib, "avutil.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-// --- Globals ---
-const char* shaderSource = R"(
-Texture2D texY : register(t0);
-Texture2D texUV : register(t1);
-SamplerState samp : register(s0);
-
-struct VS_INPUT {
-    float3 pos : POSITION;
-    float2 tex : TEXCOORD;
-};
-
-struct PS_INPUT {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-PS_INPUT VS(VS_INPUT input) {
-    PS_INPUT output;
-    output.pos = float4(input.pos, 1.0f);
-    output.tex = input.tex;
-    return output;
-}
-
-float4 PS(PS_INPUT input) : SV_Target {
-    float y = texY.Sample(samp, input.tex).r;
-    float2 uv = texUV.Sample(samp, input.tex).rg - 0.5f;
-
-    // BT.709 YUV to RGB conversion
-    float r = y + 1.5748f * uv.y;
-    float g = y - 0.1873f * uv.x - 0.4681f * uv.y;
-    float b = y + 1.8556f * uv.x;
-
-    return float4(r, g, b, 1.0f);
-}
-)";
 
 // --- Globals ---
 IDXGISwapChain* g_SwapChain = nullptr;
@@ -87,6 +53,8 @@ ID3D11InputLayout* g_Layout = nullptr;
 ID3D11Buffer* g_VBuffer = nullptr;
 
 DXShader dxShader;
+DXRenderer* dxRenderer = nullptr;
+
 struct Vertex { float x, y, z; float u, v; };
 
 static enum AVPixelFormat get_hw_format(AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts) {
@@ -122,34 +90,6 @@ void InitD3D(HWND hwnd) {
     g_Device->CreateRenderTargetView(pBackBuffer, nullptr, &g_RTV);
     pBackBuffer->Release();
 
-    // Compile Shaders from string
-    //ID3DBlob* vsBlob, * psBlob, * errBlob;
-    //HRESULT hr;
-    //// Compile Vertex Shader
-    //hr = D3DCompile(shaderSource, strlen(shaderSource), nullptr, nullptr, nullptr, "VS", "vs_5_0", 0, 0, &vsBlob, &errBlob);
-    //if (FAILED(hr)) {
-    //    if (errBlob) {
-    //        fprintf(stderr, "Vertex Shader Error: %s\n", (char*)errBlob->GetBufferPointer());
-    //        errBlob->Release();
-    //    }
-    //    return; // Or handle error appropriately
-    //}
-    //
-    //
-    //// Compile Pixel Shader
-    //hr = D3DCompile(shaderSource, strlen(shaderSource), nullptr, nullptr, nullptr, "PS", "ps_5_0", 0, 0, &psBlob, &errBlob);
-    //if (FAILED(hr)) {
-    //    if (errBlob) {
-    //        fprintf(stderr, "Pixel Shader Error: %s\n", (char*)errBlob->GetBufferPointer());
-    //        errBlob->Release();
-    //    }
-    //    if (vsBlob) vsBlob->Release();
-    //    return;
-    //}
-
-    //g_Device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &g_VS);
-    //g_Device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &g_PS);
-
     if (!dxShader.Load(g_Device, L"shaders.hlsl")) {
         fprintf(stderr, "ERROR: Failed to load shaders.\n");
         return;
@@ -178,15 +118,12 @@ void InitD3D(HWND hwnd) {
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
-    if (msg == WM_DESTROY) { PostQuitMessage(0); return 0; }
-    if (msg == WM_SIZE && g_SwapChain && wp != SIZE_MINIMIZED) {
-        // Release RTV before resizing swap chain buffers
-        if (g_RTV) { g_RTV->Release(); g_RTV = nullptr; }
-        g_SwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
-        ID3D11Texture2D* pBackBuffer = nullptr;
-        g_SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
-        g_Device->CreateRenderTargetView(pBackBuffer, nullptr, &g_RTV);
-        pBackBuffer->Release();
+    if (msg == WM_DESTROY) {
+        PostQuitMessage(0);
+        return 0;
+    }
+    if (msg == WM_SIZE && dxRenderer && wp != SIZE_MINIMIZED) {
+        dxRenderer->Resize(LOWORD(lp), HIWORD(lp));
     }
     return DefWindowProc(hwnd, msg, wp, lp);
 }
@@ -197,18 +134,13 @@ int main() {
     freopen_s(&f, "CONOUT$", "w", stderr);
 
     WNDCLASS wc = { 0 };
-    wc.lpfnWndProc = WndProc; wc.lpszClassName = L"VP"; wc.hInstance = GetModuleHandle(NULL);
+    wc.lpfnWndProc = WndProc; 
+    wc.lpszClassName = L"VP"; 
+    wc.hInstance = GetModuleHandle(NULL);
     RegisterClass(&wc);
-    HWND hwnd = CreateWindow(L"VP", L"Zero-Copy Player", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 1280, 720, 0, 0, wc.hInstance, 0);
+    HWND hwnd = CreateWindow(L"VP", L"Zero-Copy Player (Refactored)", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 1280, 720, 0, 0, wc.hInstance, 0);
+    //InitD3D(hwnd);
 
-    InitD3D(hwnd);
-
-    if (!g_Device || !g_Context || !g_SwapChain) {
-        fprintf(stderr, "ERROR: D3D11 device/swapchain creation failed.\n"); fflush(stderr);
-        return -1;
-    }
-
-    // Resolve video path relative to the .exe so working directory doesn't matter
     char exePath[MAX_PATH] = {};
     GetModuleFileNameA(nullptr, exePath, MAX_PATH);
     char* lastSlash = strrchr(exePath, '\\');
@@ -241,6 +173,16 @@ int main() {
     AVCodecContext* decoder_ctx = avcodec_alloc_context3(codec);
     avcodec_parameters_to_context(decoder_ctx, fmt_ctx->streams[video_stream]->codecpar);
 
+    int videoW = fmt_ctx->streams[video_stream]->codecpar->width;
+    int videoH = fmt_ctx->streams[video_stream]->codecpar->height;
+
+    // Initialize Renderer
+    dxRenderer = new DXRenderer();
+    if (!dxRenderer->Initialize(hwnd, videoW, videoH)) {
+        fprintf(stderr, "ERROR: Renderer initialization failed.\n");
+        return -1;
+    }
+
     AVBufferRef* hw_device_ctx = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_D3D11VA);
     if (!hw_device_ctx) {
         fprintf(stderr, "ERROR: Failed to allocate D3D11VA hw device context.\n"); fflush(stderr);
@@ -249,10 +191,10 @@ int main() {
 
     AVHWDeviceContext* device_ctx = (AVHWDeviceContext*)hw_device_ctx->data;
     AVD3D11VADeviceContext* d3d11_hwctx = (AVD3D11VADeviceContext*)device_ctx->hwctx;
-    d3d11_hwctx->device = g_Device;
-    g_Device->AddRef();
-    d3d11_hwctx->device_context = g_Context;
-    g_Context->AddRef();
+    d3d11_hwctx->device = dxRenderer->GetDevice();
+    d3d11_hwctx->device->AddRef();
+    d3d11_hwctx->device_context = dxRenderer->GetContext();
+    d3d11_hwctx->device_context->AddRef();
 
     if (av_hwdevice_ctx_init(hw_device_ctx) < 0) {
         fprintf(stderr, "ERROR: Failed to initialize D3D11VA hw device context.\n"); fflush(stderr);
@@ -268,52 +210,6 @@ int main() {
         return -1;
     }
 
-    // Staging texture: NV12 with D3D11_BIND_SHADER_RESOURCE for SRV creation.
-    // FFmpeg's decode pool uses D3D11_BIND_DECODER only, so we GPU-copy each frame
-    // into this texture (CopySubresourceRegion) before sampling it in the shader.
-    int videoW = fmt_ctx->streams[video_stream]->codecpar->width;
-    int videoH = fmt_ctx->streams[video_stream]->codecpar->height;
-    ID3D11Texture2D* g_StagingTex = nullptr;
-    {
-        D3D11_TEXTURE2D_DESC td = {};
-        td.Width = videoW;
-        td.Height = videoH;
-        td.MipLevels = 1;
-        td.ArraySize = 1;
-        td.Format = DXGI_FORMAT_NV12;
-        td.SampleDesc.Count = 1;
-        td.Usage = D3D11_USAGE_DEFAULT;
-        td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-        if (FAILED(g_Device->CreateTexture2D(&td, nullptr, &g_StagingTex))) {
-            fprintf(stderr, "ERROR: Failed to create NV12 staging texture.\n"); fflush(stderr);
-            return -1;
-        }
-    }
-
-    // Pre-build SRVs for the staging texture (created once, reused every frame)
-    ID3D11ShaderResourceView* g_SrvY = nullptr;
-    ID3D11ShaderResourceView* g_SrvUV = nullptr;
-    {
-        D3D11_SHADER_RESOURCE_VIEW_DESC yDesc = {};
-        yDesc.Format = DXGI_FORMAT_R8_UNORM;
-        yDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-        yDesc.Texture2D.MipLevels = 1;
-        yDesc.Texture2D.MostDetailedMip = 0;
-        g_Device->CreateShaderResourceView(g_StagingTex, &yDesc, &g_SrvY);
-
-        D3D11_SHADER_RESOURCE_VIEW_DESC uvDesc = {};
-        uvDesc.Format = DXGI_FORMAT_R8G8_UNORM;
-        uvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-        uvDesc.Texture2D.MipLevels = 1;
-        uvDesc.Texture2D.MostDetailedMip = 0;
-        g_Device->CreateShaderResourceView(g_StagingTex, &uvDesc, &g_SrvUV);
-
-        if (!g_SrvY || !g_SrvUV) {
-            fprintf(stderr, "ERROR: Failed to create SRVs for staging texture.\n"); fflush(stderr);
-            return -1;
-        }
-    }
-
     AVPacket* pkt = av_packet_alloc();
     AVFrame* frame = av_frame_alloc();
     MSG msg = { 0 };
@@ -321,102 +217,32 @@ int main() {
     int fpsFrameCount = 0;
     auto fpsTimer = std::chrono::steady_clock::now();
 
+    // Playback Loop
     while (msg.message != WM_QUIT) {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) { DispatchMessage(&msg); continue; }
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+            DispatchMessage(&msg);
+            continue;
+        }
 
-        int readRet = av_read_frame(fmt_ctx, pkt);
-        if (readRet < 0) {
-            // End of file: flush decoder, then seek back to start to loop
-            avcodec_send_packet(decoder_ctx, nullptr);
-            avcodec_flush_buffers(decoder_ctx);
+        if (av_read_frame(fmt_ctx, pkt) < 0) {
             av_seek_frame(fmt_ctx, video_stream, 0, AVSEEK_FLAG_BACKWARD);
             continue;
         }
 
         if (pkt->stream_index == video_stream && avcodec_send_packet(decoder_ctx, pkt) == 0) {
             while (avcodec_receive_frame(decoder_ctx, frame) == 0) {
-
-                // GPU copy: blit the decoded array slice into our shader-bindable staging texture.
-                // For a planar NV12 Texture2DArray the subresource index is:
-                //   PlaneIndex * ArraySize + ArraySlice   (MipLevels = 1)
-                // Y  plane (plane 0): subresource = sliceIndex
-                // UV plane (plane 1): subresource = ArraySize + sliceIndex
-                ID3D11Texture2D* decodeTex = (ID3D11Texture2D*)frame->data[0];
-                UINT sliceIndex = (UINT)(intptr_t)frame->data[1];
-                D3D11_TEXTURE2D_DESC decodeDesc;
-                decodeTex->GetDesc(&decodeDesc);
-                g_Context->CopySubresourceRegion(
-                    g_StagingTex, 0, 0, 0, 0,
-                    decodeTex, sliceIndex, nullptr);
-                g_Context->CopySubresourceRegion(
-                    g_StagingTex, 1, 0, 0, 0,
-                    decodeTex, decodeDesc.ArraySize + sliceIndex, nullptr);
-
-                // SET VIEWPORT: letterbox to preserve aspect ratio, centered in the window
-                RECT clientRect;
-                GetClientRect(hwnd, &clientRect);
-                float winW = (float)(clientRect.right - clientRect.left);
-                float winH = (float)(clientRect.bottom - clientRect.top);
-                float videoAR = (float)videoW / (float)videoH;
-                float winAR = winW / winH;
-                float vpW, vpH;
-                if (winAR > videoAR) {
-                    vpH = winH;
-                    vpW = winH * videoAR;
-                }
-                else {
-                    vpW = winW;
-                    vpH = winW / videoAR;
-                }
-                float vpX = (winW - vpW) * 0.5f;
-                float vpY = (winH - vpH) * 0.5f;
-                D3D11_VIEWPORT vp = { vpX, vpY, vpW, vpH, 0.0f, 1.0f };
-                g_Context->RSSetViewports(1, &vp);
-
-                // Render
-                float clearColor[4] = { 0, 0, 0, 1 };
-                g_Context->ClearRenderTargetView(g_RTV, clearColor);
-
-                UINT stride = sizeof(Vertex), offset = 0;
-                g_Context->IASetVertexBuffers(0, 1, &g_VBuffer, &stride, &offset);
-                g_Context->IASetInputLayout(g_Layout);
-                g_Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-                
-                /*g_Context->VSSetShader(g_VS, nullptr, 0);
-                g_Context->PSSetShader(g_PS, nullptr, 0);*/
-
-                g_Context->VSSetShader(dxShader.VertexShader.Get(), nullptr, 0);
-                g_Context->PSSetShader(dxShader.PixelShader.Get(), nullptr, 0);
-
-                g_Context->PSSetShaderResources(0, 1, &g_SrvY);
-                g_Context->PSSetShaderResources(1, 1, &g_SrvUV);
-                g_Context->PSSetSamplers(0, 1, &g_Sampler);
-                g_Context->OMSetRenderTargets(1, &g_RTV, nullptr);
-
-                g_Context->Draw(6, 0);
-                g_SwapChain->Present(1, 0);
-
-                ++fpsFrameCount;
-                auto now = std::chrono::steady_clock::now();
-                float elapsed = std::chrono::duration<float>(now - fpsTimer).count();
-                if (elapsed >= 1.0f) {
-                    fprintf(stderr, "FPS: %d\n", fpsFrameCount);
-                    fflush(stderr);
-                    fpsFrameCount = 0;
-                    fpsTimer = now;
-                }
-
+                dxRenderer->RenderFrame(frame);
                 av_frame_unref(frame);
             }
         }
         av_packet_unref(pkt);
     }
+
     av_frame_free(&frame);
     av_packet_free(&pkt);
     avcodec_free_context(&decoder_ctx);
     avformat_close_input(&fmt_ctx);
-    if (g_SrvY)  g_SrvY->Release();
-    if (g_SrvUV) g_SrvUV->Release();
-    if (g_StagingTex) g_StagingTex->Release();
+	delete dxRenderer;
+
     return 0;
 }

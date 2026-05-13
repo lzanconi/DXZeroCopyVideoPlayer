@@ -139,11 +139,18 @@ avformat.lib
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ContentManager.cpp" />
+    <ClCompile Include="DXRenderer.cpp" />
     <ClCompile Include="DXShader.cpp" />
+    <ClCompile Include="IRenderer.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ContentManager.h" />
+    <ClInclude Include="customtypes.h" />
+    <ClInclude Include="DXRenderer.h" />
     <ClInclude Include="DXShader.h" />
+    <ClInclude Include="IRenderer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
