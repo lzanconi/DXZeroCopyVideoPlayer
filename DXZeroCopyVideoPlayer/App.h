@@ -34,7 +34,6 @@ public:
 private:
 	bool isFullscreen = false;
 	IRenderer *renderer = nullptr;	
-	VideoSource *videoSource;
 	AVBufferRef* hw_ctx;
 	AVPacket* raw_packet;
 	AVFrame* frame;

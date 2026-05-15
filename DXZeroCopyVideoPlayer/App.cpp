@@ -9,6 +9,7 @@ extern "C" {
 #include <libavutil/hwcontext_d3d11va.h>
 #include <libavutil/frame.h>
 #include <libavcodec/packet.h>
+#include "ContentManager.h"
 }
 
 // Initialize the static AppState member
@@ -16,6 +17,13 @@ AppState App::state;
 
 App::App(int width, int height)
 {
+    ContentManager contentMgr;
+	contentMgr.LoadVideoContentFromFolder(".\\Videos");
+    if (contentMgr.GetVideoContents().empty())
+    {
+        std::cerr << "No .mp4 files found." << std::endl;
+    }
+
     wndClass.lpfnWndProc = WndProc;
     wndClass.lpszClassName = L"VP";
     wndClass.hInstance = GetModuleHandle(NULL);
@@ -49,10 +57,26 @@ App::App(int width, int height)
         return;
     }
 
-	videoSource = new VideoSource();
-    videoSource->Open(videoPath, hw_ctx);
-	videoSource->SetLooped(true);
-	videoSource->Play(GetTimeStd());
+    for (const auto& videoContent : contentMgr.GetVideoContents())
+    {
+		VideoSource* videoSource = new VideoSource();
+        if (videoSource->Open(videoContent.filename, hw_ctx))
+        {
+            videoSource->SetFadeInDuration(videoContent.fadeInDuration);
+            videoSource->SetFadeOutDuration(videoContent.fadeOutDuration);
+            videoSource->SetLooped(videoContent.looped);
+            videoSource->positions = videoContent.positions;
+            state.sources.push_back(videoSource);
+        }
+        else
+        {
+            std::cerr << "Failed to open video: " << videoContent.filename << std::endl;
+            delete videoSource;
+		}
+	}
+
+	state.sources[0]->SetLooped(true);  
+	state.sources[0]->Play(GetTimeStd());
 
 	raw_packet = av_packet_alloc();
 	frame = av_frame_alloc();
@@ -67,9 +91,6 @@ App::~App()
     if (renderer)
 		delete renderer;
 
-    if (videoSource)
-        delete videoSource;
-
     av_frame_free(&frame);
     av_packet_free(&raw_packet);
     if (hw_ctx)
@@ -80,12 +101,27 @@ void App::Run()
 {
     while (msg.message != WM_QUIT) 
     {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) 
+        {
             DispatchMessage(&msg);
             continue;
         }
-
-        videoSource->UpdateAndRender(renderer, frame, raw_packet, 0);
+        
+        if (!state.sources.empty())
+        {
+            if (state.sources[0] && state.sources[0]->Ready())
+            {
+                state.sources[0]->UpdateAndRender(renderer, frame, raw_packet, 0);
+            }
+        }
+        else
+        {
+            static_cast<DXRenderer*>(renderer)->RenderIdle();
+		}
+        /*if (videoSource && videoSource->Ready())
+            videoSource->UpdateAndRender(renderer, frame, raw_packet, 0);
+        else
+            static_cast<DXRenderer*>(renderer)->RenderIdle();*/
     }
 }
 
@@ -134,15 +170,6 @@ LRESULT CALLBACK App::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
 LRESULT App::HandleMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
-    /*if (msg == WM_DESTROY)
-    {
-        PostQuitMessage(0);
-        return 0;
-    }
-    if (msg == WM_SIZE && renderer && wp != SIZE_MINIMIZED)
-    {
-        renderer->Resize(LOWORD(lp), HIWORD(lp));
-    }*/
     switch (msg)
     {
     case WM_DESTROY:

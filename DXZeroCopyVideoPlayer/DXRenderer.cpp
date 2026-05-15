@@ -117,6 +117,13 @@ void DXRenderer::RenderFrame(AVFrame* frame) {
     m_swapChain->Present(1, 0);
 }
 
+void DXRenderer::RenderIdle() {
+    float clearColor[4] = { 0, 0, 0, 1 };
+    m_context->ClearRenderTargetView(m_rtv.Get(), clearColor);
+    m_context->OMSetRenderTargets(1, m_rtv.GetAddressOf(), nullptr);
+    m_swapChain->Present(1, 0);
+}
+
 void DXRenderer::Resize(int width, int height) {
     if (m_swapChain) {
         m_rtv.Reset();

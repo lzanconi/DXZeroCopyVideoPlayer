@@ -12,6 +12,7 @@ public:
 
     bool Initialize(HWND hwnd, int videoWidth, int videoHeight) override;
     void RenderFrame(AVFrame* frame) override;
+    void RenderIdle();
     void Resize(int width, int height) override;
 
     ID3D11Device* GetDevice() const { return m_device.Get(); }

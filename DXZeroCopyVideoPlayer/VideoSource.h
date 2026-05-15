@@ -75,6 +75,7 @@ public:
     void SetFadeOutDuration(float d);
     int GetVideoWidth() const;
     int GetVideoHeight() const;
+	bool Ready() const { return isInitialized; }
 
     static enum AVPixelFormat get_hw_format(AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts) {
         for (const enum AVPixelFormat* p = pix_fmts; *p != -1; p++) {
