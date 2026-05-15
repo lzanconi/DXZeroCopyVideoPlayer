@@ -94,9 +94,11 @@ bool VideoSource::UpdateAndRender(IRenderer* renderer, AVFrame* frame, AVPacket*
     if (startTime <= 0)
         return true;
 
-    double playPos = currentTime;
+    double playPos = currentTime - startTime;
 
 	float alpha = CalculateAlpha(currentTime);  
+
+    //std::cout << "LastPTS: " << lastPTS << std::endl;
 
     if (playPos > lastPTS)
     {

@@ -1,6 +1,8 @@
 #include "App.h"
 #include "DXRenderer.h"
 #include "VideoSource.h"
+#include "ContentManager.h"
+#include "NetworkManager.h"
 #include "utils.h"
 #include <iostream>
 
@@ -9,7 +11,7 @@ extern "C" {
 #include <libavutil/hwcontext_d3d11va.h>
 #include <libavutil/frame.h>
 #include <libavcodec/packet.h>
-#include "ContentManager.h"
+
 }
 
 // Initialize the static AppState member
@@ -81,9 +83,12 @@ App::App(int width, int height)
 	raw_packet = av_packet_alloc();
 	frame = av_frame_alloc();
     
+    state.networkMgr = new NetworkManager("127.0.0.1", 5555, this);
+
 	TriggerFullscreen();
 	isFullscreen = true;
     
+	state.networkMgr->Start();
 }
 
 App::~App()
@@ -130,22 +135,22 @@ void App::Run()
 
 VideoSource* App::GetBackgroundVideo()
 {
-    return nullptr;
+    return state.sources.empty() ? nullptr : state.sources[0];
 }
 
 std::vector<float> App::GetPositions()
 {
-    return std::vector<float>();
+    return state.sources[0]->positions;
 }
 
 double App::GetLastPTS()
 {
-    return 0.0;
+    return state.sources[0]->GetLastPTS();
 }
 
 int64_t App::GetBGCaptureTimeNS()
 {
-    return 0;
+    return state.sources[0]->GetBGCaptureTimeNS();
 }
 
 

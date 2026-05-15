@@ -31,6 +31,7 @@ extern "C" {
 #pragma comment(lib, "d3dcompiler.lib")
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+//int main()
 {
 	try
 	{

@@ -146,6 +146,7 @@ avformat.lib
     <ClCompile Include="IApp.cpp" />
     <ClCompile Include="IRenderer.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="NetworkManager.cpp" />
     <ClCompile Include="VideoSource.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -156,6 +157,7 @@ avformat.lib
     <ClInclude Include="DXShader.h" />
     <ClInclude Include="IApp.h" />
     <ClInclude Include="IRenderer.h" />
+    <ClInclude Include="NetworkManager.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="VideoSource.h" />
   </ItemGroup>
