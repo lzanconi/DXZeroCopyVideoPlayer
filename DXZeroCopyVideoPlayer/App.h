@@ -25,11 +25,14 @@ public:
 private:
 	static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
 	LRESULT HandleMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+	void TriggerFullscreen();
+	void TriggerWindowedMode();
 
 public:
 	static AppState state;
 
 private:
+	bool isFullscreen = false;
 	IRenderer *renderer = nullptr;	
 	VideoSource *videoSource;
 	AVBufferRef* hw_ctx;
@@ -38,5 +41,7 @@ private:
 	WNDCLASS wndClass = { 0 };
 	MSG msg = { 0 };
 	HWND hwnd = nullptr;
+	// Stores window position before going fullscreen
+	RECT windowRect = { 0 };	
 };
 

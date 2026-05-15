@@ -132,7 +132,7 @@ LRESULT CALLBACK App::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
 LRESULT App::HandleMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
-    if (msg == WM_DESTROY)
+    /*if (msg == WM_DESTROY)
     {
         PostQuitMessage(0);
         return 0;
@@ -140,6 +140,75 @@ LRESULT App::HandleMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     if (msg == WM_SIZE && renderer && wp != SIZE_MINIMIZED)
     {
         renderer->Resize(LOWORD(lp), HIWORD(lp));
+    }*/
+    switch (msg)
+    {
+    case WM_DESTROY:
+        PostQuitMessage(0);
+		return 0;
+
+    case WM_SIZE:
+        if (renderer && wp != SIZE_MINIMIZED)
+        {
+            renderer->Resize(LOWORD(lp), HIWORD(lp));
+        }
+		return 0;
+    
+    case WM_KEYDOWN:
+        if (wp == VK_ESCAPE)
+        {
+            DestroyWindow(hwnd);
+            return 0;
+		}
+
+        if (wp == 'F')
+        {
+			isFullscreen = !isFullscreen;
+
+            if (isFullscreen)
+            {
+                TriggerFullscreen();
+            }
+            else
+            {
+                TriggerWindowedMode();
+            }
+
+            return 0;
+        }
     }
     return DefWindowProc(hwnd, msg, wp, lp);
+}
+
+void App::TriggerFullscreen()
+{
+    // Save the current window placement
+    GetWindowRect(hwnd, &windowRect);
+
+    // Set style to borderless
+    SetWindowLongPtr(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+
+    // Get monitor information to fill the screen
+    HMONITOR hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi = { sizeof(mi) };
+    GetMonitorInfo(hMonitor, &mi);
+
+    SetWindowPos(hwnd, HWND_TOP,
+        mi.rcMonitor.left, mi.rcMonitor.top,
+        mi.rcMonitor.right - mi.rcMonitor.left,
+        mi.rcMonitor.bottom - mi.rcMonitor.top,
+        SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+}
+
+void App::TriggerWindowedMode()
+{
+    // Restore windowed style
+    SetWindowLongPtr(hwnd, GWL_STYLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE);
+
+    // Restore original position
+    SetWindowPos(hwnd, HWND_TOP,
+        windowRect.left, windowRect.top,
+        windowRect.right - windowRect.left,
+        windowRect.bottom - windowRect.top,
+        SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
 }
