@@ -96,6 +96,8 @@ bool VideoSource::UpdateAndRender(IRenderer* renderer, AVFrame* frame, AVPacket*
 
     double playPos = currentTime;
 
+	float alpha = CalculateAlpha(currentTime);  
+
     if (playPos > lastPTS)
     {
 		bool frameDecoded = false;
@@ -179,11 +181,6 @@ void VideoSource::Play(double startTime)
 	lastPTS = -1.0; 
 }
 
-double VideoSource::GetDurationInSeconds() const
-{
-	return 0.0;
-}
-
 void VideoSource::SetLooped(bool l) { looped = l; }
 double VideoSource::GetLastPTS() { return lastPTS; }
 double VideoSource::GetAdjustedStartTime() const { return startTime + totalPausedTime; }
@@ -191,6 +188,14 @@ int64_t VideoSource::GetBGCaptureTimeNS() { return bg_capture_time_ns; }
 bool VideoSource::IsPaused() const { return isPaused; }
 void VideoSource::SetFadeInDuration(float d) { fadeInDuration = d; }
 void VideoSource::SetFadeOutDuration(float d) { fadeOutDuration = d; }
+
+double VideoSource::GetDurationInSeconds() const
+{
+    if (!formatCtx || streamID < 0)
+        return 0;
+
+    return (double)formatCtx->streams[streamID]->duration * av_q2d(formatCtx->streams[streamID]->time_base);
+}
 
 int VideoSource::GetVideoWidth() const
 {
@@ -200,4 +205,29 @@ int VideoSource::GetVideoWidth() const
 int VideoSource::GetVideoHeight() const
 {
 	return videoHeight;
+}
+
+float VideoSource::CalculateAlpha(double currentTime)
+{
+    double elapsed = currentTime;
+	double totalDuration = GetDurationInSeconds();
+	float alpha = 1.0f;
+
+    if (elapsed < fadeInDuration && fadeInDuration > 0)
+    {
+        alpha = (float)(elapsed / fadeInDuration);
+    }
+    else if (elapsed > (totalDuration - fadeOutDuration) && fadeOutDuration > 0)
+    {
+        double timeRemaining = totalDuration - elapsed;
+        alpha = (float)(timeRemaining / fadeOutDuration);
+    }
+
+    if (alpha < 0.0f)
+        alpha = 0.0f;
+
+    if (alpha > 1.0f)
+        alpha = 1.0f;
+
+    return alpha;
 }

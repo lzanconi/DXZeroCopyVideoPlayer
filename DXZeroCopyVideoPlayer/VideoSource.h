@@ -83,5 +83,8 @@ public:
         }
         return AV_PIX_FMT_NONE;
     }
+
+private:
+    float CalculateAlpha(double currentTime);
 };
 
