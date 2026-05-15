@@ -83,7 +83,8 @@ App::App(int width, int height)
 	raw_packet = av_packet_alloc();
 	frame = av_frame_alloc();
     
-    state.networkMgr = new NetworkManager("127.0.0.1", 5555, this);
+    //port 15555 for the real server / port 5555 for simulator
+    state.networkMgr = new NetworkManager("127.0.0.1", 15555, this);
 
 	TriggerFullscreen();
 	isFullscreen = true;

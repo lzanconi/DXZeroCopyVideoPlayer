@@ -42,6 +42,6 @@ private:
     IApp* appInterface;
 
     // Configuration for position sending
-    double positions_delay_ms = 100.0;
+    double positions_delay_ms = -130.0;
     double positions_framerate = 60.0;
 };
