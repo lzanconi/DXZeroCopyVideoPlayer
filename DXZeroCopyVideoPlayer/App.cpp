@@ -2,6 +2,7 @@
 #include "DXRenderer.h"
 #include "VideoSource.h"
 #include "utils.h"
+#include <iostream>
 
 extern "C" {
 #include <libavutil/hwcontext.h>
@@ -42,6 +43,12 @@ App::App(int width, int height)
     d3d11_hwctx->device_context = dxRenderer->GetContext();
     d3d11_hwctx->device_context->AddRef();
 
+    if (av_hwdevice_ctx_init(hw_ctx) < 0)
+    {
+        std::cerr << "ERROR: Failed to initialize D3D11VA hw device context." << std::endl;
+        return;
+    }
+
 	videoSource = new VideoSource();
     videoSource->Open(videoPath, hw_ctx);
 	videoSource->SetLooped(true);
@@ -50,14 +57,7 @@ App::App(int width, int height)
 	raw_packet = av_packet_alloc();
 	frame = av_frame_alloc();
     
-    while (msg.message != WM_QUIT) {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-            DispatchMessage(&msg);
-            continue;
-        }
-
-        videoSource->UpdateAndRender(dxRenderer, frame, raw_packet, 0);
-    }
+    
 }
 
 App::~App()
@@ -76,7 +76,15 @@ App::~App()
 
 void App::Run()
 {
+    while (msg.message != WM_QUIT) 
+    {
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+            DispatchMessage(&msg);
+            continue;
+        }
 
+        videoSource->UpdateAndRender(renderer, frame, raw_packet, 0);
+    }
 }
 
 VideoSource* App::GetBackgroundVideo()
