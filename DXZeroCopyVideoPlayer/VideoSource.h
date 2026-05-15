@@ -7,6 +7,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/hwcontext.h>
+#include <libavutil/frame.h>
 }
 
 // Forward declarations for FFmpeg structs to keep the header clean
@@ -55,7 +56,7 @@ public:
     void Rewind();
 
     // Starts or resumes playback
-    void Play(double currentGLFWTime);
+    void Play(double currentTime);
 
     // Main update loop: decodes and renders frames
     bool UpdateAndRender(IRenderer* renderer, DXShader* shader, AVFrame* frm, AVPacket* raw_packet, int slot);
@@ -72,6 +73,8 @@ public:
     bool IsPaused() const;
     void SetFadeInDuration(float d);
     void SetFadeOutDuration(float d);
+    int GetVideoWidth() const;
+    int GetVideoHeight() const;
 
     static enum AVPixelFormat get_hw_format(AVCodecContext* ctx, const enum AVPixelFormat* pix_fmts) {
         for (const enum AVPixelFormat* p = pix_fmts; *p != -1; p++) {

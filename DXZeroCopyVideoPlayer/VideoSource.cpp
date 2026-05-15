@@ -7,6 +7,8 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/hwcontext.h>
+#include <libavutil/frame.h>
+
 }
 
 VideoSource::VideoSource() : bg_capture_time_ns(0) {}
@@ -100,34 +102,30 @@ bool VideoSource::UpdateAndRender(IRenderer* renderer, DXShader* shader, AVFrame
 
         while (!frameDecoded)
         {
-            if (av_read_frame(formatCtx, raw_packet) < 0)
+            if (av_read_frame(formatCtx, raw_packet) < 0) 
             {
-                if (raw_packet->stream_index == streamID)
-                {
-                    av_seek_frame(formatCtx, streamID, 0, AVSEEK_FLAG_BACKWARD);
-                    continue;
-                }
-
-                if (raw_packet->stream_index == streamID && avcodec_send_packet(codecCtx, raw_packet) == 0)
-                {
-                    while (avcodec_receive_frame(codecCtx, frame) == 0) 
-                    {
-                        renderer->RenderFrame(frame);
-                        av_frame_unref(frame);
-                        lastPTS = playPos;
-						frameDecoded = true;
-                        bg_capture_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            std::chrono::steady_clock::now().time_since_epoch()).count();
-                    }
-				}
-
-				av_packet_unref(raw_packet);
+                av_seek_frame(formatCtx, streamID, 0, AVSEEK_FLAG_BACKWARD);
+                continue;
             }
+
+            if (raw_packet->stream_index == streamID && avcodec_send_packet(codecCtx, raw_packet) == 0) 
+            {
+                while (avcodec_receive_frame(codecCtx, frame) == 0) 
+                {
+                    renderer->RenderFrame(frame);
+                    av_frame_unref(frame);
+                    lastPTS = playPos;
+                    frameDecoded = true;
+                    bg_capture_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::steady_clock::now().time_since_epoch()).count();
+                }
+            }
+            av_packet_unref(raw_packet);
         }
     }
 
 
-	return false;
+	return true;
 }
 
 
@@ -136,8 +134,10 @@ void VideoSource::Rewind()
 {
 }
 
-void VideoSource::Play(double currentGLFWTime)
+void VideoSource::Play(double startTime)
 {
+    this->startTime = startTime;
+	lastPTS = -1.0; 
 }
 
 double VideoSource::GetDurationInSeconds() const
@@ -152,3 +152,13 @@ int64_t VideoSource::GetBGCaptureTimeNS() { return bg_capture_time_ns; }
 bool VideoSource::IsPaused() const { return isPaused; }
 void VideoSource::SetFadeInDuration(float d) { fadeInDuration = d; }
 void VideoSource::SetFadeOutDuration(float d) { fadeOutDuration = d; }
+
+int VideoSource::GetVideoWidth() const
+{
+    return videoWidth;
+}
+
+int VideoSource::GetVideoHeight() const
+{
+	return videoHeight;
+}
