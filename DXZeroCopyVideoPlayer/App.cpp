@@ -57,6 +57,8 @@ App::App(int width, int height)
 	raw_packet = av_packet_alloc();
 	frame = av_frame_alloc();
     
+	TriggerFullscreen();
+	isFullscreen = true;
     
 }
 
@@ -198,6 +200,8 @@ void App::TriggerFullscreen()
         mi.rcMonitor.right - mi.rcMonitor.left,
         mi.rcMonitor.bottom - mi.rcMonitor.top,
         SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+
+    while (ShowCursor(FALSE) >= 0);
 }
 
 void App::TriggerWindowedMode()
@@ -211,4 +215,6 @@ void App::TriggerWindowedMode()
         windowRect.right - windowRect.left,
         windowRect.bottom - windowRect.top,
         SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+
+    while (ShowCursor(TRUE) < 0);
 }

@@ -30,7 +30,7 @@ extern "C" {
 #pragma comment(lib, "avutil.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-int main()
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
 	try
 	{
