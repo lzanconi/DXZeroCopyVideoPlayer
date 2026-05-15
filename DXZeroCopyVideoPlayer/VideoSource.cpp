@@ -102,7 +102,40 @@ bool VideoSource::UpdateAndRender(IRenderer* renderer, DXShader* shader, AVFrame
 
         while (!frameDecoded)
         {
-            if (av_read_frame(formatCtx, raw_packet) < 0) 
+            if (av_read_frame(formatCtx, raw_packet) >= 0)
+            {
+                if (raw_packet->stream_index == streamID)
+                {
+                    if (avcodec_send_packet(codecCtx, raw_packet) == 0)
+                    {
+                        if (avcodec_receive_frame(codecCtx, frame) >= 0)
+                        {
+                            renderer->RenderFrame(frame);
+                            av_frame_unref(frame);
+                            lastPTS = playPos;
+                            frameDecoded = true;
+                            bg_capture_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                std::chrono::steady_clock::now().time_since_epoch()).count();
+                        }
+                    }
+                }
+
+                av_packet_unref(raw_packet);
+            }
+            else
+            {
+                if (looped)
+                {
+					Rewind();
+					Play(GetTimeStd());
+                    frameDecoded = true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            /*if (av_read_frame(formatCtx, raw_packet) < 0 && looped) 
             {
                 av_seek_frame(formatCtx, streamID, 0, AVSEEK_FLAG_BACKWARD);
                 continue;
@@ -120,7 +153,7 @@ bool VideoSource::UpdateAndRender(IRenderer* renderer, DXShader* shader, AVFrame
                         std::chrono::steady_clock::now().time_since_epoch()).count();
                 }
             }
-            av_packet_unref(raw_packet);
+            av_packet_unref(raw_packet);*/
         }
     }
 
@@ -132,6 +165,12 @@ bool VideoSource::UpdateAndRender(IRenderer* renderer, DXShader* shader, AVFrame
 
 void VideoSource::Rewind()
 {
+    if (!isInitialized)
+        return;
+
+    av_seek_frame(formatCtx, streamID, 0, AVSEEK_FLAG_BACKWARD);
+    avcodec_flush_buffers(codecCtx);
+	lastPTS = -1.0; 
 }
 
 void VideoSource::Play(double startTime)

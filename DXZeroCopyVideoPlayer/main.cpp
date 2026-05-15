@@ -96,6 +96,7 @@ int main() {
         return -1;
 	}
 
+    videoSource.SetLooped(true);
 	videoSource.Play(GetTimeStd());
 
     AVPacket* pkt = av_packet_alloc();
