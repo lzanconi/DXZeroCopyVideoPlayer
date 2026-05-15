@@ -47,7 +47,9 @@ bool DXRenderer::Initialize(HWND hwnd, int videoWidth, int videoHeight) {
 
     // Initial RTV and Shaders
     Resize(0, 0);
-    if (!m_shader.Load(m_device.Get(), L"shaders.hlsl")) return false;
+    
+    if (!videoShader.Load(m_device.Get(), L"shaders.hlsl")) 
+        return false;
 
     // Setup Geometry
     Vertex vertices[] = {
@@ -62,8 +64,8 @@ bool DXRenderer::Initialize(HWND hwnd, int videoWidth, int videoHeight) {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
     };
-    m_device->CreateInputLayout(ied, 2, m_shader.VSBytecode->GetBufferPointer(),
-        m_shader.VSBytecode->GetBufferSize(), &m_layout);
+    m_device->CreateInputLayout(ied, 2, videoShader.VSBytecode->GetBufferPointer(),
+        videoShader.VSBytecode->GetBufferSize(), &m_layout);
 
     // Staging Texture for NV12
     D3D11_TEXTURE2D_DESC td = {};
@@ -105,8 +107,8 @@ void DXRenderer::RenderFrame(AVFrame* frame) {
     m_context->IASetVertexBuffers(0, 1, m_vBuffer.GetAddressOf(), &stride, &offset);
     m_context->IASetInputLayout(m_layout.Get());
     m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_context->VSSetShader(m_shader.VertexShader.Get(), nullptr, 0);
-    m_context->PSSetShader(m_shader.PixelShader.Get(), nullptr, 0);
+    m_context->VSSetShader(videoShader.VertexShader.Get(), nullptr, 0);
+    m_context->PSSetShader(videoShader.PixelShader.Get(), nullptr, 0);
     m_context->PSSetShaderResources(0, 1, m_srvY.GetAddressOf());
     m_context->PSSetShaderResources(1, 1, m_srvUV.GetAddressOf());
     m_context->OMSetRenderTargets(1, m_rtv.GetAddressOf(), nullptr);

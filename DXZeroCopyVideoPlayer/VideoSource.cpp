@@ -84,7 +84,7 @@ void VideoSource::Close()
 }
 
 
-bool VideoSource::UpdateAndRender(IRenderer* renderer, DXShader* shader, AVFrame* frame, AVPacket* raw_packet, int slot)
+bool VideoSource::UpdateAndRender(IRenderer* renderer, AVFrame* frame, AVPacket* raw_packet, int slot)
 {
     if (!isInitialized)
         return true;

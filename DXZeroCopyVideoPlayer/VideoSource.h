@@ -59,7 +59,7 @@ public:
     void Play(double currentTime);
 
     // Main update loop: decodes and renders frames
-    bool UpdateAndRender(IRenderer* renderer, DXShader* shader, AVFrame* frm, AVPacket* raw_packet, int slot);
+    bool UpdateAndRender(IRenderer* renderer, AVFrame* frm, AVPacket* raw_packet, int slot);
 
     // Cleans up FFmpeg resources
     void Close();

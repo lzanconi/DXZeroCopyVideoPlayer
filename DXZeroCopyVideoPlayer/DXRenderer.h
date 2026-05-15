@@ -16,6 +16,8 @@ public:
 
     ID3D11Device* GetDevice() const { return m_device.Get(); }
     ID3D11DeviceContext* GetContext() const { return m_context.Get(); }
+    DXShader* GetVideoShader() const { return const_cast<DXShader*>(&videoShader); }
+
 
 private:
     void UpdateViewport(int windowWidth, int windowHeight);
@@ -31,7 +33,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_srvY;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_srvUV;
 
-    DXShader m_shader;
+    DXShader videoShader;
     int m_videoW = 0;
     int m_videoH = 0;
     HWND m_hwnd = nullptr;

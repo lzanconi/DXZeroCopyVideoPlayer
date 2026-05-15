@@ -1,6 +1,9 @@
 #pragma once
 #include <windows.h>
+
+extern "C" {
 #include <libavutil/frame.h>
+}
 
 class IRenderer {
 public:
