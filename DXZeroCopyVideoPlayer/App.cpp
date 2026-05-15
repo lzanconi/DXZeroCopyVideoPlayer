@@ -91,6 +91,9 @@ App::~App()
     if (renderer)
 		delete renderer;
 
+    for (auto source : state.sources)
+        delete source;
+
     av_frame_free(&frame);
     av_packet_free(&raw_packet);
     if (hw_ctx)
